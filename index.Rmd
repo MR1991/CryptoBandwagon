@@ -1,25 +1,133 @@
 ---
 title: "Crypto Bandwagon Analysis"
-author: "Maurice Richard"
-date: "24 maart 2018"
 output: html_document
 runtime: shiny
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-library(shiny)
+```{r setup, include = FALSE}
+
+    knitr::opts_chunk$set(echo = FALSE)
+    options(scipen=999)
+    
 ```
 
-This R Markdown document is made interactive using Shiny. Unlike the more traditional workflow of creating static reports, you can now create documents that allow your readers to change the assumptions underlying your analysis and see the results immediately. 
+```{r libraries, include = FALSE, warning = FALSE}
 
-To learn more, see [Interactive Documents](http://rmarkdown.rstudio.com/authoring_shiny.html).
+    library(tidyr)      # data wrangling
+    library(dplyr)      # data wrangling
+    library(lubridate)  # dates
+    library(magrittr)   # pipelines
+    library(knitr)      # kable
+    library(ggplot2)    # plotting
+    library(plotly)     # dynamic plots
 
-## Inputs and Outputs
+```
 
-You can embed Shiny inputs and outputs in your document. Outputs are automatically updated whenever inputs change.  This demonstrates how a standard R plot can be made interactive by wrapping it in the Shiny `renderPlot` function. The `selectInput` and `sliderInput` functions create the input widgets used to drive the plot.
+## Data Preparation
+We base our analyse on a dataset obtained from Coinmarketcap.com through the 'crypto' package. https://cran.r-project.org/web/packages/crypto/index.html
 
-```{r eruptions, echo=FALSE}
+```{r Load data, cache = TRUE}
+
+    # Production dataset
+    # df_marketdata <- read.csv(file = "Data/Crypto-Markets.csv", stringsAsFactors = FALSE, sep = ";")
+    # df_marketdata$date %<>% as.Date("%d-%m-%Y") 
+    
+    # Test dataset
+    df_marketdata <- read.csv(file = "Data/df_test.csv", stringsAsFactors = FALSE, sep = ";")
+    df_marketdata$date %<>% as.Date("%Y-%m-%d")
+
+```
+
+We will need to clean the dataset. The first step is to check whether there are any NA's or strange values in the data that we obtained from CMC. 
+
+```{r Check for data quality}
+
+    marketdata_NA <- df_marketdata %>%
+        select_if(function(x) any(is.na(x))) %>% colnames()
+
+    print(marketdata_NA[-1])
+
+```
+
+Some coins have duplicate rows, for now we exclude these completely.
+```{r Cleaning duplicates}
+
+    # Check for duplicate rows in the data
+    duplicates <- df_marketdata %>% group_by(name, date) %>% summarise(count = n()) %>% filter(count != 1)
+    df_marketdata %<>% filter(!name %in% duplicates$name)
+    
+    # excluded the following coins due to duplicates
+    print(table(duplicates$name))
+
+```
+
+```{r Add historical rank}
+
+    # Calculate rank for each day in the past. 
+    df_marketdata        %<>% 
+        arrange(ranknow, date)  %>% 
+        group_by(ranknow) %>%
+        mutate(prevclose = dplyr::lag(close, n = 1, default = NA)) %>%
+        mutate(percchg = (close - prevclose) / prevclose * 100) %>%
+        arrange(ranknow, desc(date))
+
+    df_marketdata %<>%
+        group_by(date) %>% 
+        mutate(rank_then = dense_rank(desc(market)))
+    
+```
+
+With the CMC data complete and checked we can analyse the market and different crypto coins.
+
+## Visualizations
+
+Let's take a look at the data we have.
+
+```{r BTC Graph, echo=FALSE}
+
+    inputPanel(
+      
+      dateRangeInput('dateRange',
+                                         label = 'Date range input: yyyy-mm-dd',
+                                         start = min(df_marketdata$date), end = max(df_marketdata$date)),
+
+      selectInput("currency", "Choose a coin:",
+                                list(`Currencies` = unique(df_marketdata$symbol))),
+      selectInput("log", "Scale:",
+                                list(`Currencies` = c("Linear","Logarithmic")))
+    )
+
+    renderPlotly({
+            p <- df_marketdata %>% 
+                 filter(symbol == input$currency) %>% 
+                 ggplot(aes(x = date, 
+                            y = high,
+                            text = paste('Date: ', as.Date(date),
+                                          '<br>High: ', high))) +
+                 geom_line(group = 1)+
+                 scale_x_date(limits = input$dateRange)
+            
+            p2 <- df_marketdata %>% 
+                  filter(symbol == input$currency) %>% 
+                  ggplot(aes(x = date, 
+                            y = high,
+                            text = paste('Date: ', as.Date(date),
+                                          '<br>High: ', high))) +
+                  geom_line(group = 1)+
+                  scale_x_date(limits = input$dateRange)+
+                  scale_y_log10()
+            
+            
+            if (input$log == "Logarithmic"){ p <- p + scale_y_log10() }
+            
+            ggplotly(p, tooltip = "text")
+      
+    })
+```
+
+
+
+```{r Example, echo=FALSE}
 
 inputPanel(
   selectInput("n_breaks", label = "Number of bins:",
@@ -37,25 +145,3 @@ renderPlot({
   lines(dens, col = "blue")
 })
 ```
-
-## Embedded Application
-
-It's also possible to embed an entire Shiny application within an R Markdown document using the `shinyAppDir` function. This example embeds a Shiny application located in another directory:
-
-```{r tabsets, echo=FALSE}
-shinyAppDir(
-  system.file("examples/06_tabsets", package = "shiny"),
-  options = list(
-    width = "100%", height = 550
-  )
-)
-```
-
-Note the use of the `height` parameter to determine how much vertical space the embedded application should occupy.
-
-You can also use the `shinyApp` function to define an application inline rather then in an external directory.
-
-In all of R code chunks above the `echo = FALSE` attribute is used. This is to prevent the R code within the chunk from rendering in the document alongside the Shiny components.
-
-
-
