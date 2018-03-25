@@ -29,12 +29,14 @@ We base our analyse on a dataset obtained from Coinmarketcap.com through the 'cr
 ```{r Load data, cache = TRUE}
 
     # Production dataset
-    # df_marketdata <- read.csv(file = "Data/Crypto-Markets.csv", stringsAsFactors = FALSE, sep = ";")
-    # df_marketdata$date %<>% as.Date("%d-%m-%Y") 
-    
+    df_marketdata <- read.csv(file = "Data/Crypto-Markets.csv", stringsAsFactors = FALSE, sep = ";")
+    df_marketdata$date %<>% as.Date("%d-%m-%Y")
+    df_marketdata$low %<>% as.numeric()
+
     # Test dataset
     df_marketdata <- read.csv(file = "Data/df_test.csv", stringsAsFactors = FALSE, sep = ";")
     df_marketdata$date %<>% as.Date("%Y-%m-%d")
+    df_marketdata$low %<>% as.numeric()
 
 ```
 
@@ -46,6 +48,9 @@ We will need to clean the dataset. The first step is to check whether there are 
         select_if(function(x) any(is.na(x))) %>% colnames()
 
     print(marketdata_NA[-1])
+    
+    # one close value of coin EMV is 0, changing this to the low value of that date.
+    df_marketdata[df_marketdata$close == 0, "close"] <- 0.00000000000001 
 
 ```
 
@@ -53,7 +58,11 @@ Some coins have duplicate rows, for now we exclude these completely.
 ```{r Cleaning duplicates}
 
     # Check for duplicate rows in the data
-    duplicates <- df_marketdata %>% group_by(name, date) %>% summarise(count = n()) %>% filter(count != 1)
+    duplicates <- df_marketdata %>% 
+                  group_by(name, date) %>% 
+                  summarise(count = n()) %>% 
+                  filter(count != 1)
+
     df_marketdata %<>% filter(!name %in% duplicates$name)
     
     # excluded the following coins due to duplicates
@@ -63,14 +72,15 @@ Some coins have duplicate rows, for now we exclude these completely.
 
 ```{r Add historical rank}
 
-    # Calculate rank for each day in the past. 
-    df_marketdata        %<>% 
-        arrange(ranknow, date)  %>% 
+    # Calculate % gains per day.
+    df_marketdata %<>% 
+        arrange(ranknow, date) %>% 
         group_by(ranknow) %>%
         mutate(prevclose = dplyr::lag(close, n = 1, default = NA)) %>%
         mutate(percchg = (close - prevclose) / prevclose * 100) %>%
         arrange(ranknow, desc(date))
 
+    # Calculate rank for each day in the past. 
     df_marketdata %<>%
         group_by(date) %>% 
         mutate(rank_then = dense_rank(desc(market)))
@@ -79,11 +89,94 @@ Some coins have duplicate rows, for now we exclude these completely.
 
 With the CMC data complete and checked we can analyse the market and different crypto coins.
 
+## Model
+
+```{r Model inputs }
+
+# INPUTS
+# start and end date of analysis
+    SDate <- as.Date("2017-01-01")
+    EDate <- as.Date("2017-12-31")
+
+# max rank of coins to be selected
+    MaxRank <- 150
+
+# period between switches
+    HPeriod <- 7 # in days
+    SwitchDates <- seq(SDate, EDate, by = paste0(HPeriod, " days"))
+    
+# number of coins to be selected per period
+    CoinsPeriod <- 2
+    
+# percentage drop to sell
+    StopLoss <- 0.25 * 100  # stoploss percentage 
+    
+# initial investment, total so its split per coin
+    Initial <- 500 # in dollars
+    
+# reinvest or not
+    Reinvest <- FALSE # boolean
+    
+# proceeds in BTC or cash
+    HoldInBTC <- FALSE # boolean
+
+# (optional inputs)
+# duration below sellpoint
+# min % gain last week
+
+```
+
+
+```{r Model}
+
+
+    # Calculate % gain over previous period and actual gain over next period. Not adjusted for stoploss.
+    df_modeldata <- df_marketdata %>% 
+                    filter(date >= SDate & date <= EDate,
+                           rank_then <= MaxRank) %>%
+                    arrange(ranknow, date) %>% 
+                    group_by(ranknow) %>%
+                    mutate(prevcloseP = lag(close, n = HPeriod, default = NA))  %>%
+                    mutate(percchgP = (close - prevcloseP) / prevcloseP * 100)  %>%
+                    mutate(nextcloseP = lead(close, n = HPeriod, default = NA)) %>%
+                    mutate(nextchgP = (nextcloseP - close) / close * 100) %>%
+                    arrange(ranknow, desc(date))
+
+    # Find lowest point during next period
+    df_modeldata %<>%           
+        arrange(ranknow, date) %>% 
+        group_by(ranknow) %>% 
+        mutate(periodlow = Inf)
+    
+    # Dynamic loop to grab lowest point
+    for (i in 1:HPeriod) {
+        df_modeldata %<>% 
+        mutate(leadlow = dplyr::lead(low, n = i, default = NA)) %>% 
+        mutate(periodlow = ifelse(leadlow <= periodlow, leadlow, periodlow)) 
+    }
+    
+    # Arrange dataframe again, remove unnecessary column, calculate lowest point in %, compare to stoploss and adjust.
+    df_modeldata %<>%  
+    arrange(ranknow, desc(date)) %>%
+    select(-leadlow) %>%
+    mutate(nextlowpercP = (periodlow - close)/close *100) %>%
+    mutate(return = ifelse(nextlowpercP <= -StopLoss,  -StopLoss, nextchgP))   # applying stoploss 
+
+    
+    
+    # Let a model select x coins per period based on the criteria and put those rows in a dataframe for result analysis.
+
+        
+```
+
+
+
+
 ## Visualizations
 
 Let's take a look at the data we have.
 
-```{r BTC Graph, echo=FALSE}
+```{r BTC Graph, echo = FALSE}
 
     inputPanel(
       
