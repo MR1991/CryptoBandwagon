@@ -7,7 +7,7 @@ runtime: shiny
 ```{r setup, include = FALSE}
 
     knitr::opts_chunk$set(echo = FALSE)
-    options(scipen=999)
+    options(scipen = 999)
     
 ```
 
@@ -23,50 +23,52 @@ runtime: shiny
 
 ```
 
-## Data Preparation
-We base our analyse on a dataset obtained from Coinmarketcap.com through the 'crypto' package. https://cran.r-project.org/web/packages/crypto/index.html
 
-```{r Load data, cache = TRUE}
+```{r Load data, cache = TRUE, warning = FALSE}
+    # Data Preparation
+    # We base our analyse on a dataset obtained from Coinmarketcap.com through the 'crypto' package. 
+    # https://cran.r-project.org/web/packages/crypto/index.html
 
     # Production dataset
-    df_marketdata <- read.csv(file = "Data/Crypto-Markets.csv", stringsAsFactors = FALSE, sep = ";")
+    df_marketdata      <- read.csv(file = "Data/Crypto-Markets.csv", stringsAsFactors = FALSE, sep = ";")
     df_marketdata$date %<>% as.Date("%d-%m-%Y")
-    df_marketdata$low %<>% as.numeric()
+    df_marketdata$low  %<>% as.numeric()
 
     # Test dataset
-    df_marketdata <- read.csv(file = "Data/df_test.csv", stringsAsFactors = FALSE, sep = ";")
-    df_marketdata$date %<>% as.Date("%Y-%m-%d")
-    df_marketdata$low %<>% as.numeric()
+    #df_marketdata      <- read.csv(file = "Data/df_test.csv", stringsAsFactors = FALSE, sep = ";")
+    #df_marketdata$date %<>% as.Date("%Y-%m-%d")
+    #df_marketdata$low  %<>% as.numeric()
 
 ```
 
-We will need to clean the dataset. The first step is to check whether there are any NA's or strange values in the data that we obtained from CMC. 
 
-```{r Check for data quality}
+
+```{r Check for data quality, warning = FALSE}
+
+    # Cleaning dataset. Check whether there are any NA's or strange values in the data that we obtained from CMC. 
 
     marketdata_NA <- df_marketdata %>%
-        select_if(function(x) any(is.na(x))) %>% colnames()
+                     select_if(function(x) any(is.na(x))) %>% 
+                     colnames()
 
-    print(marketdata_NA[-1])
-    
     # one close value of coin EMV is 0, changing this to the low value of that date.
     df_marketdata[df_marketdata$close == 0, "close"] <- 0.00000000000001 
 
 ```
 
-Some coins have duplicate rows, for now we exclude these completely.
+
 ```{r Cleaning duplicates}
 
     # Check for duplicate rows in the data
+    # Some coins have duplicate rows, for now we exclude these completely.
+    
     duplicates <- df_marketdata %>% 
                   group_by(name, date) %>% 
                   summarise(count = n()) %>% 
                   filter(count != 1)
 
-    df_marketdata %<>% filter(!name %in% duplicates$name)
-    
-    # excluded the following coins due to duplicates
-    print(table(duplicates$name))
+    df_marketdata %<>% 
+        filter(!name %in% duplicates$name)
 
 ```
 
@@ -79,162 +81,221 @@ Some coins have duplicate rows, for now we exclude these completely.
         mutate(prevclose = dplyr::lag(close, n = 1, default = NA)) %>%
         mutate(percchg = (close - prevclose) / prevclose * 100) %>%
         arrange(ranknow, desc(date))
-
+    
     # Calculate rank for each day in the past. 
     df_marketdata %<>%
         group_by(date) %>% 
-        mutate(rank_then = dense_rank(desc(market)))
-    
+        mutate(rankthen = dense_rank(desc(market)))
+
 ```
 
-With the CMC data complete and checked we can analyse the market and different crypto coins.
 
-## Model
+```{r Model}  
+        
+    run_model <- function(SDate, EDate, MaxRank, HPeriod, CoinsPeriod, StopLoss, Initial, Reinvest, HoldInBTC){
+            
+        # Calculate % gain over previous period and actual gain over next period. Not adjusted for stoploss.
+        df_modeldata <- df_marketdata %>% 
+                        filter(date >= SDate - HPeriod & date <= EDate + HPeriod,
+                               rankthen <= MaxRank) %>%
+                        arrange(ranknow, date) %>% 
+                        group_by(ranknow) %>%
+                        mutate(prevclose = lag(close, n = HPeriod, default = NA))   %>%
+                        mutate(prevChg   = (close - prevclose) / prevclose * 100) %>%
+                        mutate(nextclose = lead(close, n = HPeriod, default = NA))  %>%
+                        mutate(nextChg   = (nextclose - close) / close * 100)      %>%
+                        arrange(ranknow, desc(date))
+    
+        # Find lowest point during next period
+        df_modeldata %<>%           
+            arrange(ranknow, date) %>% 
+            group_by(ranknow) %>% 
+            mutate(periodlow = Inf)
+        
+        # Dynamic loop to grab lowest point
+        for (i in 1:HPeriod) {
+            df_modeldata %<>% 
+                mutate(leadlow = dplyr::lead(low, n = i, default = NA),
+                       periodlow = ifelse(leadlow <= periodlow, leadlow, periodlow)) 
+        }
+        
+        # Arrange dataframe again, remove unnecessary column, calculate lowest point in %, 
+        # compare to stoploss and adjust.
+        df_modeldata %<>%  
+            arrange(ranknow, desc(date)) %>%
+            select(-leadlow) %>%
+            mutate(nextLow = (periodlow - close)/close * 100) %>%
+            mutate(return = ifelse(nextLow <= -StopLoss * 100,  -StopLoss * 100, nextChg))   # applying stoploss
+        
+        # Slice off begin and end of dataframe
+        df_modeldata %<>% 
+            filter(date >= SDate & date <= EDate)
+    
+        ## Selector module}
+        # Let a model select x coins per period based on the criteria and put those rows 
+        # in a dataframe for result analysis
+        
+        df_selected = list()
+    
+        df_modeldata %<>% 
+            arrange(desc(prevChg)) %>%
+            filter(!is.na(nextclose))
+        
+        SwitchDates <- seq(SDate, EDate, by = paste0(HPeriod, " days"))
+        
+        for (i in SwitchDates){
+            df_selected[[i]] <- df_modeldata %>% 
+                                filter(date == i) %>% 
+                                ungroup() %>% 
+                                slice(1:CoinsPeriod)
+        }
+        
+        df_selected <- bind_rows(df_selected)
+        df_selected$returnfiat <- df_selected$return / 100 * Initial / CoinsPeriod
+        return(df_selected)
+    }
 
-```{r Model inputs }
+```
 
-# INPUTS
-# start and end date of analysis
-    SDate <- as.Date("2017-01-01")
+```{r Generate Test data, include = FALSE}
+
+    # INPUTS
+    # start and end date of analysis
+    SDate <- as.Date("2017-10-01")
     EDate <- as.Date("2017-12-31")
 
-# max rank of coins to be selected
+    # max rank of coins to be selected
     MaxRank <- 150
 
-# period between switches
-    HPeriod <- 7 # in days
+    # period between switches
+    HPeriod <- 3 # in days
     SwitchDates <- seq(SDate, EDate, by = paste0(HPeriod, " days"))
-    
-# number of coins to be selected per period
+
+    # number of coins to be selected per period
     CoinsPeriod <- 2
-    
-# percentage drop to sell
-    StopLoss <- 0.25 * 100  # stoploss percentage 
-    
-# initial investment, total so its split per coin
+
+    # percentage drop to sell
+    StopLoss <- 0.25 * 100  # stoploss percentage
+
+    # initial investment, total so its split per coin
     Initial <- 500 # in dollars
-    
-# reinvest or not
+
+    # reinvest or not
     Reinvest <- FALSE # boolean
-    
-# proceeds in BTC or cash
+
+    # proceeds in BTC or cash
     HoldInBTC <- FALSE # boolean
 
-# (optional inputs)
-# duration below sellpoint
-# min % gain last week
+    # (optional inputs)
+    # duration below sellpoint
+    # min % gain last week
+    
+     test_data <- run_model(SDate, EDate, MaxRank, HPeriod, CoinsPeriod, StopLoss, Initial, Reinvest, HoldInBTC)
+
 
 ```
 
-
-```{r Model}
-
-
-    # Calculate % gain over previous period and actual gain over next period. Not adjusted for stoploss.
-    df_modeldata <- df_marketdata %>% 
-                    filter(date >= SDate & date <= EDate,
-                           rank_then <= MaxRank) %>%
-                    arrange(ranknow, date) %>% 
-                    group_by(ranknow) %>%
-                    mutate(prevcloseP = lag(close, n = HPeriod, default = NA))  %>%
-                    mutate(percchgP = (close - prevcloseP) / prevcloseP * 100)  %>%
-                    mutate(nextcloseP = lead(close, n = HPeriod, default = NA)) %>%
-                    mutate(nextchgP = (nextcloseP - close) / close * 100) %>%
-                    arrange(ranknow, desc(date))
-
-    # Find lowest point during next period
-    df_modeldata %<>%           
-        arrange(ranknow, date) %>% 
-        group_by(ranknow) %>% 
-        mutate(periodlow = Inf)
-    
-    # Dynamic loop to grab lowest point
-    for (i in 1:HPeriod) {
-        df_modeldata %<>% 
-        mutate(leadlow = dplyr::lead(low, n = i, default = NA)) %>% 
-        mutate(periodlow = ifelse(leadlow <= periodlow, leadlow, periodlow)) 
-    }
-    
-    # Arrange dataframe again, remove unnecessary column, calculate lowest point in %, compare to stoploss and adjust.
-    df_modeldata %<>%  
-    arrange(ranknow, desc(date)) %>%
-    select(-leadlow) %>%
-    mutate(nextlowpercP = (periodlow - close)/close *100) %>%
-    mutate(return = ifelse(nextlowpercP <= -StopLoss,  -StopLoss, nextchgP))   # applying stoploss 
-
-    
-    
-    # Let a model select x coins per period based on the criteria and put those rows in a dataframe for result analysis.
-
-        
-```
+```{r Model Graph}
 
 
-
-
-## Visualizations
-
-Let's take a look at the data we have.
-
-```{r BTC Graph, echo = FALSE}
 
     inputPanel(
-      
-      dateRangeInput('dateRange',
-                                         label = 'Date range input: yyyy-mm-dd',
-                                         start = min(df_marketdata$date), end = max(df_marketdata$date)),
-
-      selectInput("currency", "Choose a coin:",
-                                list(`Currencies` = unique(df_marketdata$symbol))),
-      selectInput("log", "Scale:",
-                                list(`Currencies` = c("Linear","Logarithmic")))
+        dateRangeInput('dateRange', 
+                       label = 'Date range input: yyyy-mm-dd',
+                       start = min("2017-10-01", na.rm = TRUE), 
+                       end = max(df_marketdata$date, na.rm = TRUE)),
+        
+        numericInput("MaxRank"    , "Max rank of selected coin:", value = 150),
+        numericInput("HPeriod"    , "Length of period in days:" , value = 7),
+        numericInput("CoinsPeriod", "# of coins per period:"    , value = 2),
+        numericInput("StopLoss"   , "Maximum loss :"            , value = 0.25),
+        numericInput("Initial"    , "Starting funds:"           , value = 500),
+        selectInput ("Reinvest"   , "Reinvest profits"          , list(`Reinvest`  = c("True","False"))),
+        selectInput ("HoldInBTC"  , "Holding earnings in BTC"   , list(`HoldInBTC` = c("True","False")))
     )
 
-    renderPlotly({
-            p <- df_marketdata %>% 
-                 filter(symbol == input$currency) %>% 
-                 ggplot(aes(x = date, 
-                            y = high,
-                            text = paste('Date: ', as.Date(date),
-                                          '<br>High: ', high))) +
-                 geom_line(group = 1)+
-                 scale_x_date(limits = input$dateRange)
-            
-            p2 <- df_marketdata %>% 
-                  filter(symbol == input$currency) %>% 
-                  ggplot(aes(x = date, 
-                            y = high,
-                            text = paste('Date: ', as.Date(date),
-                                          '<br>High: ', high))) +
-                  geom_line(group = 1)+
-                  scale_x_date(limits = input$dateRange)+
-                  scale_y_log10()
-            
-            
-            if (input$log == "Logarithmic"){ p <- p + scale_y_log10() }
-            
-            ggplotly(p, tooltip = "text")
-      
+    activeDataset <- reactive({
+        run_model(input$dateRange[1],
+                  input$dateRange[2], 
+                  input$MaxRank, 
+                  input$HPeriod, 
+                  input$CoinsPeriod, 
+                  input$StopLoss, 
+                  input$Initial, 
+                  input$Reinvest, 
+                  input$HoldInBTC) 
     })
+    
+
+    
+    
+  # Graph showing return per coin, including mention of period
+    renderPlot({
+        p <- activeDataset() %>% 
+             group_by(date) %>% 
+             summarize(returnfiat = sum(returnfiat)) %>%
+             mutate(returnfiattime = cumsum(returnfiat),
+                    pos = returnfiat >= 0)
+        
+        ymin <- floor(min(p$returnfiattime, p$returnfiat) / 100) * 100       
+        ymax <- round(max(p$returnfiattime, p$returnfiat) / 100) * 100
+
+
+        q <- ggplot(p)+
+                geom_bar(aes(x = date, y = returnfiat, fill = pos), stat = "identity")+
+                geom_line(aes(x= date, y = returnfiattime), stat="identity")+
+                scale_fill_manual(values = c('red', 'darkgreen')) +
+               # scale_x_discrete(labels = "%b %d", breaks = paste0(input$HPeriod, " days")) +
+                scale_y_continuous(breaks = seq(ymin,ymax, by = (ymax-ymin) / 10))+
+                labs(title = "Return in fiat", x = "Date", y = "Fiat")+
+                guides(fill = FALSE)+
+                theme(panel.background = element_rect(fill = 'white', colour = 'black'),
+                      panel.grid.major = element_line(colour = 'grey'),
+                      panel.grid.minor = element_line(colour = 'grey'))
+        q
+    })
+
+
+    div(style='height:600px; overflow-y: scroll',
+    renderTable({
+        activeDataset() %>%
+            select(symbol, name, date, prevclose, close, nextclose, prevChg, nextChg, nextLow, return) %>%
+            mutate(date = format(date,'%Y/%m/%d')) %>%
+            arrange(desc(date)) %>%
+            print()
+    })
+    )
+    
+# renderText({ 
+#     totalreturnfiat <- activeDataset() %>% 
+#         select(returnfiat) %>% 
+#         sum(na.rm = TRUE)
+#     paste0("The return for this strategy would have been ", format(totalreturnfiat, digits = 2))
+#     
+# })
+# 
+#   # Graph showing return per period
+#     ggplotly(ggplot(test_data, aes(x = date, y = returnfiat)) +
+#         stat_summary(fun.y = sum, geom = "bar", aes(fill = ..y.. > 0), position = "stack")+
+#         scale_fill_manual(values = c('red', 'darkgreen')) +
+#         coord_flip() +
+#         scale_x_date(date_labels = "%b %d", date_breaks = paste0(HPeriod, " days"))+
+#         guides(fill = FALSE))
+# 
+#       # get date labels for each date.
+# renderPlotly({
+#     plot <- plot_ly(activeDataset(), 
+#                     x = ~return, 
+#                     y = ~date,
+#                     type = "bar",
+#                     orientation = 'h') %>%
+#                 layout(xaxis = list(title = 'Count'), barmode = 'group')
+#     print(plot)
+# })
+    
+
+
+
 ```
 
 
-
-```{r Example, echo=FALSE}
-
-inputPanel(
-  selectInput("n_breaks", label = "Number of bins:",
-              choices = c(10, 20, 35, 50), selected = 20),
-  
-  sliderInput("bw_adjust", label = "Bandwidth adjustment:",
-              min = 0.2, max = 2, value = 1, step = 0.2)
-)
-
-renderPlot({
-  hist(faithful$eruptions, probability = TRUE, breaks = as.numeric(input$n_breaks),
-       xlab = "Duration (minutes)", main = "Geyser eruption duration")
-  
-  dens <- density(faithful$eruptions, adjust = input$bw_adjust)
-  lines(dens, col = "blue")
-})
-```
