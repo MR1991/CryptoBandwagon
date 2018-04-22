@@ -5,8 +5,8 @@ account: mr1991
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 306832
-bundleId: 1286121
+bundleId: 1319394
 url: https://mr1991.shinyapps.io/CryptoBandwagon/
-when: 1521910526.61293
+when: 1523798972.19938
 asMultiple: FALSE
 asStatic: FALSE

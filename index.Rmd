@@ -1,8 +1,21 @@
 ---
-title: "Crypto Bandwagon Analysis"
+title: <center> <h1>Crypto Bandwagon BackTester</h1> </center>
 output: html_document
 runtime: shiny
 ---
+***
+<center> 
+**If you like it please donate to upgrade hosting**  
+**Bitcoin/Bitcoin Cash:** 16f5MKogAhddR63b2zZEFx7g5yLB2oyV76   
+**ERC-20:** 0x0134cfe4c693c0ae4287caa235dc540953ffbc16  
+**Litecoin:** LdVZXYgF3qhGEkHKJGJ1n3gyK4w8GHvRBq  
+**NANO:** xrb_39tq7hidqkknoux8sps9q7e49eky4prnaauqge8tj8yfpexmmqcx4xafn4zk  
+
+Description of model is at the bottom of this page.  
+Let me know any feature requests by filing an issue: https://github.com/MR1991/CryptoBandwagon/  
+  
+***
+
 
 ```{r setup, include = FALSE}
 
@@ -13,6 +26,8 @@ runtime: shiny
 
 ```{r libraries, include = FALSE, warning = FALSE}
 
+    library(data.table) # fread
+    library(bit64)      # integer64 type
     library(tidyr)      # data wrangling
     library(dplyr)      # data wrangling
     library(lubridate)  # dates
@@ -23,25 +38,17 @@ runtime: shiny
 
 ```
 
-
 ```{r Load data, cache = TRUE, warning = FALSE}
-    # Data Preparation
+
     # We base our analyse on a dataset obtained from Coinmarketcap.com through the 'crypto' package. 
     # https://cran.r-project.org/web/packages/crypto/index.html
 
     # Production dataset
-    df_marketdata      <- read.csv(file = "Data/Crypto-Markets.csv", stringsAsFactors = FALSE, sep = ";")
-    df_marketdata$date %<>% as.Date("%d-%m-%Y")
+    df_marketdata      <- as.data.frame(fread("Data/Crypto-Markets.csv", showProgress = FALSE)) 
+    df_marketdata$date %<>% as.Date("%Y-%m-%d")
     df_marketdata$low  %<>% as.numeric()
 
-    # Test dataset
-    #df_marketdata      <- read.csv(file = "Data/df_test.csv", stringsAsFactors = FALSE, sep = ";")
-    #df_marketdata$date %<>% as.Date("%Y-%m-%d")
-    #df_marketdata$low  %<>% as.numeric()
-
 ```
-
-
 
 ```{r Check for data quality, warning = FALSE}
 
@@ -152,6 +159,15 @@ runtime: shiny
         
         df_selected <- bind_rows(df_selected)
         df_selected$returnfiat <- df_selected$return / 100 * Initial / CoinsPeriod
+        
+        # module to enable reinvest
+        # if (input$Reinvest == FALSE){
+        #     df_selected$returnfiat <- df_selected$return / 100 * Initial / CoinsPeriod
+        # } else {
+        #     
+        # 
+        # }
+        # 
         return(df_selected)
     }
 
@@ -159,59 +175,58 @@ runtime: shiny
 
 ```{r Generate Test data, include = FALSE}
 
-    # INPUTS
-    # start and end date of analysis
-    SDate <- as.Date("2017-10-01")
-    EDate <- as.Date("2017-12-31")
-
-    # max rank of coins to be selected
-    MaxRank <- 150
-
-    # period between switches
-    HPeriod <- 3 # in days
-    SwitchDates <- seq(SDate, EDate, by = paste0(HPeriod, " days"))
-
-    # number of coins to be selected per period
-    CoinsPeriod <- 2
-
-    # percentage drop to sell
-    StopLoss <- 0.25 * 100  # stoploss percentage
-
-    # initial investment, total so its split per coin
-    Initial <- 500 # in dollars
-
-    # reinvest or not
-    Reinvest <- FALSE # boolean
-
-    # proceeds in BTC or cash
-    HoldInBTC <- FALSE # boolean
-
-    # (optional inputs)
-    # duration below sellpoint
-    # min % gain last week
+    # # INPUTS
+    # # start and end date of analysis
+    # SDate <- as.Date("2017-10-01")
+    # EDate <- as.Date("2017-12-31")
+    # 
+    # # max rank of coins to be selected
+    # MaxRank <- 150
+    # 
+    # # period between switches
+    # HPeriod <- 3 # in days
+    # SwitchDates <- seq(SDate, EDate, by = paste0(HPeriod, " days"))
+    # 
+    # # number of coins to be selected per period
+    # CoinsPeriod <- 2
+    # 
+    # # percentage drop to sell
+    # StopLoss <- 0.25 * 100  # stoploss percentage
+    # 
+    # # initial investment, total so its split per coin
+    # Initial <- 500 # in dollars
+    # 
+    # # reinvest or not
+    # Reinvest <- TRUE # boolean
+    # 
+    # # proceeds in BTC or cash
+    # HoldInBTC <- FALSE # boolean
+    # 
+    # # (optional inputs)
+    # # duration below sellpoint
+    # # min % gain last week
     
-     test_data <- run_model(SDate, EDate, MaxRank, HPeriod, CoinsPeriod, StopLoss, Initial, Reinvest, HoldInBTC)
+     # test_data <- run_model(SDate, EDate, MaxRank, HPeriod, CoinsPeriod, StopLoss, Initial, Reinvest, HoldInBTC)
 
 
 ```
 
+
 ```{r Model Graph}
 
-
-
     inputPanel(
-        dateRangeInput('dateRange', 
-                       label = 'Date range input: yyyy-mm-dd',
+        dateRangeInput("dateRange", 
+                       label = "Date range:",
                        start = min("2017-10-01", na.rm = TRUE), 
                        end = max(df_marketdata$date, na.rm = TRUE)),
         
-        numericInput("MaxRank"    , "Max rank of selected coin:", value = 150),
+        numericInput("MaxRank"    , "Max rank of selected coins:", value = 150),
         numericInput("HPeriod"    , "Length of period in days:" , value = 7),
         numericInput("CoinsPeriod", "# of coins per period:"    , value = 2),
-        numericInput("StopLoss"   , "Maximum loss :"            , value = 0.25),
-        numericInput("Initial"    , "Starting funds:"           , value = 500),
-        selectInput ("Reinvest"   , "Reinvest profits"          , list(`Reinvest`  = c("True","False"))),
-        selectInput ("HoldInBTC"  , "Holding earnings in BTC"   , list(`HoldInBTC` = c("True","False")))
+        numericInput("Initial"    , "Starting funds ($):"           , value = 500),
+        numericInput("StopLoss"   , "Maximum loss:"            , value = 0.25)
+       # selectInput ("Reinvest"   , "Reinvest profits"          , list(`Reinvest`  = c("True","False"))), # in dev
+       # selectInput ("HoldInBTC"  , "Holding earnings in BTC"   , list(`HoldInBTC` = c("True","False")))# in dev
     )
 
     activeDataset <- reactive({
@@ -222,12 +237,9 @@ runtime: shiny
                   input$CoinsPeriod, 
                   input$StopLoss, 
                   input$Initial, 
-                  input$Reinvest, 
-                  input$HoldInBTC) 
+                  input$Reinvest == FALSE, 
+                  input$HoldInBTC == FALSE) 
     })
-    
-
-    
     
   # Graph showing return per coin, including mention of period
     renderPlot({
@@ -240,14 +252,14 @@ runtime: shiny
         ymin <- floor(min(p$returnfiattime, p$returnfiat) / 100) * 100       
         ymax <- round(max(p$returnfiattime, p$returnfiat) / 100) * 100
 
-
+        theme_set(theme_bw())
         q <- ggplot(p)+
                 geom_bar(aes(x = date, y = returnfiat, fill = pos), stat = "identity")+
                 geom_line(aes(x= date, y = returnfiattime), stat="identity")+
                 scale_fill_manual(values = c('red', 'darkgreen')) +
                # scale_x_discrete(labels = "%b %d", breaks = paste0(input$HPeriod, " days")) +
                 scale_y_continuous(breaks = seq(ymin,ymax, by = (ymax-ymin) / 10))+
-                labs(title = "Return in fiat", x = "Date", y = "Fiat")+
+                labs(title = "Return in dollars", x = "Date", y = "$")+
                 guides(fill = FALSE)+
                 theme(panel.background = element_rect(fill = 'white', colour = 'black'),
                       panel.grid.major = element_line(colour = 'grey'),
@@ -255,47 +267,51 @@ runtime: shiny
         q
     })
 
-
-    div(style='height:600px; overflow-y: scroll',
+   # div(style='height:600px; overflow-y: scroll',
     renderTable({
-        activeDataset() %>%
-            select(symbol, name, date, prevclose, close, nextclose, prevChg, nextChg, nextLow, return) %>%
-            mutate(date = format(date,'%Y/%m/%d')) %>%
-            arrange(desc(date)) %>%
-            print()
+        t <- activeDataset() %>%
+             select(symbol, name, date, prevclose, close, nextclose, prevChg, nextChg, nextLow, return) %>%
+             mutate(date = format(date,'%Y/%m/%d')) %>%
+             arrange(desc(date))
+        names(t) <- c("Symbol", "Name", "Date", "Prev.Close ($)", "Close ($)", "Next.Close ($)", "%Prev", "%Next", "%Next.Low", "%Return")
+        print(t)
     })
-    )
+  #  )
+  
     
-# renderText({ 
-#     totalreturnfiat <- activeDataset() %>% 
-#         select(returnfiat) %>% 
-#         sum(na.rm = TRUE)
-#     paste0("The return for this strategy would have been ", format(totalreturnfiat, digits = 2))
-#     
-# })
-# 
-#   # Graph showing return per period
-#     ggplotly(ggplot(test_data, aes(x = date, y = returnfiat)) +
-#         stat_summary(fun.y = sum, geom = "bar", aes(fill = ..y.. > 0), position = "stack")+
-#         scale_fill_manual(values = c('red', 'darkgreen')) +
-#         coord_flip() +
-#         scale_x_date(date_labels = "%b %d", date_breaks = paste0(HPeriod, " days"))+
-#         guides(fill = FALSE))
-# 
-#       # get date labels for each date.
-# renderPlotly({
-#     plot <- plot_ly(activeDataset(), 
-#                     x = ~return, 
-#                     y = ~date,
-#                     type = "bar",
-#                     orientation = 'h') %>%
-#                 layout(xaxis = list(title = 'Count'), barmode = 'group')
-#     print(plot)
-# })
-    
-
-
-
 ```
+</center>
+
+### Input
+
+Name | Description
+------------------ | -------------------------------------------------
+Date Range | The period for which you want to test your strategy, 
+Max rank of selected coins | The maximum rank a coin is allowed to have for you to select it for a given period.
+Length of period in days | Number of days you hold on to your coins before reevaluating.
+'#' of coins per period | Number of coins you buy per period.
+Starting funds ($) | Initial investment spread out over the number of coins. Current model uses this each period.
+Maximum loss: | Stop loss level. Default is -25% of last close. If a coin goes under this level during a period your holdings in this coin are 'sold' until next period.
+
+#### Output  
+  
+**Graph**  
+The bars in the graph show the gain/loss in $ per period summed for your coins held during this period.  
+The line in the graph shows your cumulative gain/loss in $ for the selected date range.
+
+**Table**
+
+Name | Description
+------------------ | -------------------------------------------------
+Symbol | Tracker symbol on CMC
+Date | Date this coin was purchased
+Prev.Close | Closing price at the start of the period prior to 'Date'
+Close | Closing price at the mentioned date
+Next.Close | Closing prive at the end of the period following 'Date'
+%Prev | Percentage change over the period prior to 'Date'
+%Next | Percentage change over the period following 'Date'
+%Next.Low | Minimum percentage change reached during the period following 'Date'
+%Return | Resulting return with this coin.
+
 
 
