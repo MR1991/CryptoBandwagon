@@ -9,6 +9,8 @@ This shiny app can be used to test the **'buy high, sell higher'** strategy as p
 
 * Reinvest profits. Current model only reinvests starting funds every period. This boolean value will allow for HODL'ing and reinvesting your entire portfolio value every period.
 * [Migrate R Shiny hosting to private server on Azure or Digital Ocean.](https://www.r-bloggers.com/serving-shiny-apps-in-the-internet-with-your-own-server/)
+* Binance price scraper. Rewrite python scraper to R to obtain Binance historical listed coins and prices.
+* Automate data scraper on virtual machine. 
 * Hold in BTC. Keep portfolio in BTC when stoploss gets hit. 
 * Minimum rank. Put a cap on the minimum rank a coin has to have.
 * ... 

@@ -38,7 +38,7 @@ Let me know any feature requests by filing an issue: https://github.com/MR1991/C
 
 ```
 
-```{r Load data, cache = TRUE, warning = FALSE}
+```{r Load data, cache = FALSE, warning = FALSE}
 
     # We base our analyse on a dataset obtained from Coinmarketcap.com through the 'crypto' package. 
     # https://cran.r-project.org/web/packages/crypto/index.html
