@@ -1,0 +1,74 @@
+---
+title: "Crypto Bandwagon Backtester"
+output: html_document
+---
+
+This shiny app can be used to test the **'buy high, sell higher'** strategy as proposed in the trading experiment on http://thecryptobandwagon.com/.
+
+## To do list
+
+* Reinvest profits. Current model only reinvests starting funds every period. This boolean value will allow for HODL'ing and reinvesting your entire portfolio value every period.
+* [Migrate R Shiny hosting to private server on Azure or Digital Ocean.](https://www.r-bloggers.com/serving-shiny-apps-in-the-internet-with-your-own-server/)
+* Binance price scraper. Rewrite python scraper to R to obtain Binance historical listed coins and prices.
+* Automate data scraper on virtual machine. 
+* Hold in BTC. Keep portfolio in BTC when stoploss gets hit. 
+* Minimum rank. Put a cap on the minimum rank a coin has to have.
+* ... 
+
+Please suggest more improvements or other strategies! File an issue through github.
+
+
+## Functionality
+
+The current version is a MVP that purely replicates the basic strategy as described [here](http://thecryptobandwagon.com/index.php/2017/12/31/strategy/)
+
+#### Input
+
+Name | Description
+------------------ | -------------------------------------------------
+Date Range | The period for which you want to test your strategy, 
+Max rank of selected coins | The maximum rank a coin is allowed to have for you to select it for a given period.
+Length of period in days | Number of days you hold on to your coins before reevaluating.
+'#' of coins per period | Number of coins you buy per period.
+Starting funds ($) | Initial investment spread out over the number of coins. Current model uses this each period.
+Maximum loss: | Stop loss level. Default is -25% of last close. If a coin goes under this level during a period your holdings in this coin are 'sold' until next period.
+
+#### Output  
+  
+**Graph**  
+The bars in the graph show the gain/loss in $ per period summed for your coins held during this period.  
+The line in the graph shows your cumulative gain/loss in $ for the selected date range.
+
+**Table**
+
+Name | Description
+------------------ | -------------------------------------------------
+Symbol | Tracker symbol on CMC
+Date | Date this coin was purchased
+Prev.Close | Closing price at the start of the period prior to 'Date'
+Close | Closing price at the mentioned date
+Next.Close | Closing prive at the end of the period following 'Date'
+%Prev | Percentage change over the period prior to 'Date'
+%Next | Percentage change over the period following 'Date'
+%Next.Low | Minimum percentage change reached during the period following 'Date'
+%Return | Resulting return with this coin.
+
+
+## Acknowledgments
+Thanks to the team at https://coinmarketcap.com for consolidating all the trading data.  
+Also many thanks to [JesseVent](https://github.com/JesseVent/) for the [Crypto package](https://cran.r-project.org/web/packages/crypto/index.html) to scrape historical data.  
+Please star my repo if you find it useful and be responsible when trading.  
+  
+***
+<center>
+**Donations are welcome!**  
+**Bitcoin/Bitcoin Cash:** 16f5MKogAhddR63b2zZEFx7g5yLB2oyV76   
+**ERC-20:** 0x0134cfe4c693c0ae4287caa235dc540953ffbc16  
+**Litecoin:** LdVZXYgF3qhGEkHKJGJ1n3gyK4w8GHvRBq  
+**NANO:** xrb_39tq7hidqkknoux8sps9q7e49eky4prnaauqge8tj8yfpexmmqcx4xafn4zk  
+</center>
+***
+    
+    
+    
+

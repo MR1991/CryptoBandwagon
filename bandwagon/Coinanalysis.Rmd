@@ -1,0 +1,121 @@
+---
+title: "Coin Analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen = 999)
+```
+
+
+```{r libraries}
+
+    library(data.table) # fread
+    library(bit64)      # integer64 type
+    library(tidyr)      # data wrangling
+    library(dplyr)      # data wrangling
+    library(lubridate)  # dates
+    library(magrittr)   # pipelines
+    library(knitr)      # kable
+    library(ggplot2)    # plotting
+    library(plotly)     # dynamic plots
+    library(tidyquant)
+    
+```
+
+```{r Load data, cache = FALSE, warning = FALSE}
+
+    # We base our analyse on a dataset obtained from Coinmarketcap.com through the 'crypto' package. 
+    # https://cran.r-project.org/web/packages/crypto/index.html
+
+    # Production dataset
+    df_marketdata        <- as.data.frame(fread("data/Crypto-Markets.csv", showProgress = FALSE)) 
+    df_marketdata$date   %<>% as.Date("%Y-%m-%d")
+
+```
+
+```{r plots}
+
+  p <- df_marketdata %>% filter(symbol %in% c("FUN"), market != 0) 
+
+  ggplot(p, aes(x = date, y = as.numeric(market), colour = symbol))+
+    geom_line()+
+    scale_y_continuous()
+
+  p %>%
+    ggplot(aes(x = date, y = close)) +
+    geom_candlestick(aes(open = open, high = high, low = low, close = close),
+                        color_up = "darkgreen", color_down = "darkred", 
+                        fill_up  = "darkgreen", fill_down  = "darkred") +
+    labs(title = "AAPL Candlestick Chart", 
+         subtitle = "Zoomed in, Experimenting with Formatting",
+         y = "Closing Price", x = "") + 
+    #coord_x_date(xlim = c(end - weeks(6), end),
+    #             ylim = c(100, 120)) + 
+    theme_tq()
+
+```
+
+
+
+```{r Biggest gainers}
+
+  dates <- as.Date(c("2018-04-01","2018-04-08", "2018-04-15","2018-04-22", "2018-04-29"))
+
+  biggest <- df_marketdata %>%
+    filter(date >= as.Date("2018-01-01")) %>%
+    filter(ranknow <= 40) %>% 
+    group_by(symbol) %>%
+    mutate(change = close/lag(close, n = 1, default = NA)*100-100) %>%
+    filter(!is.na(change)) %>% 
+    arrange(ranknow, desc(date)) %>% 
+    select(symbol, date, change) %>%
+    spread(symbol, change)
+  
+    ggplotly(qplot(ranknow, change, data = biggest, colour = as.character(date))+
+      scale_y_continuous(limits = c(-1,200))+
+      scale_color_manual(name = "date",
+                     values = c("2018-04-08" = "black",
+                                "2018-04-15" = "yellow",
+                                "2018-04-22" = "red",
+                                "2018-04-29" = "green"),
+                     labels = c("2018-04-08", "2018-04-15", "2018-04-22","2018-04-29")))
+    
+
+
+  
+```
+
+
+```{r Performance }
+
+  SDate <- as.Date("2018-01-01")
+  EDate <- as.Date("2018-05-03")
+
+  performance <- df_marketdata %>%
+    filter(date %in% c(SDate, EDate)) %>%
+    filter(ranknow <= 20) %>% 
+    group_by(symbol) %>%
+    mutate(change = close/lag(close, n = 1, default = NA)*100-100) %>%
+    filter(!is.na(change)) %>% 
+    arrange(ranknow, desc(date)) %>% 
+     select(symbol, date, change)# %>%
+    # spread(symbol, change)
+  
+    ggplotly(qplot(ranknow, change, data = biggest, colour = as.character(date))+
+      scale_y_continuous(limits = c(-1,200))+
+      scale_color_manual(name = "date",
+                     values = c("2018-04-08" = "black",
+                                "2018-04-15" = "yellow",
+                                "2018-04-22" = "red",
+                                "2018-04-29" = "green"),
+                     labels = c("2018-04-08", "2018-04-15", "2018-04-22","2018-04-29")))
+    
+
+
+  
+```
+
+
+
