@@ -1,3 +1,5 @@
+
+
 # Load data -------------------------------------------------------------------------------------------------
 df_marketdata      <- as.data.frame(fread("data/Crypto-Markets.csv", showProgress = FALSE)) 
 df_marketdata$date %<>% as.Date("%Y-%m-%d")

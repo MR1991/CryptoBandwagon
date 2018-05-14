@@ -1,2 +1,6 @@
 .Rproj.user
-/Data/
+.Rhistory
+.RData
+.Ruserdata
+/data/
+.gitignore

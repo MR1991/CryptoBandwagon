@@ -1,10 +1,10 @@
 ---
-title: <center> <h1>Crypto Bandwagon BackTester</h1> </center>
+title: <center> <h1>Crypto Bandwagon Backtester</h1> </center>
 output: html_document
 runtime: shiny
 ---
+<center>
 ***
-<center> 
 **If you like it please donate to upgrade hosting**  
 **Bitcoin/Bitcoin Cash:** 16f5MKogAhddR63b2zZEFx7g5yLB2oyV76   
 **ERC-20:** 0x0134cfe4c693c0ae4287caa235dc540953ffbc16  
@@ -18,30 +18,28 @@ Let me know any feature requests by filing an issue: https://github.com/MR1991/C
 
 
 ```{r setup, include = FALSE}
-
     knitr::opts_chunk$set(echo = FALSE)
     options(scipen = 999)
-  
 ```
 
 ```{r libraries, include = FALSE, warning = FALSE}
 
- # sudo su - -c "R -e \"install.packages('data.table', repos='http://cran.rstudio.com/')\""
- # sudo su - -c "R -e \"install.packages('bit64', repos='http://cran.rstudio.com/')\""
- # sudo su - -c "R -e \"install.packages('tidyr', repos='http://cran.rstudio.com/')\""
- # sudo su - -c "R -e \"install.packages('dplyr', repos='http://cran.rstudio.com/')\""
- # sudo su - -c "R -e \"install.packages('lubridate', repos='http://cran.rstudio.com/')\""
- # sudo su - -c "R -e \"install.packages('magrittr', repos='http://cran.rstudio.com/')\""
- # sudo su - -c "R -e \"install.packages('knitr', repos='http://cran.rstudio.com/')\""
- # sudo su - -c "R -e \"install.packages('ggplot2', repos='http://cran.rstudio.com/')\""
- # sudo su - -c "R -e \"install.packages('plotly', repos='http://cran.rstudio.com/')\""
- # sudo su - -c "R -e \"install.packages('caTools', repos='http://cran.rstudio.com/')\""
- # sudo su - -c "R -e \"install.packages('bitops', repos='http://cran.rstudio.com/')\""
- # sudo su - -c "R -e \"install.packages('rprojroot', repos='http://cran.rstudio.com/')\""
- # sudo su - -c "R -e \"install.packages('rmarkdown', repos='http://cran.rstudio.com/')\""
- # sudo su - -c "R -e \"install.packages('miniUI', repos='http://cran.rstudio.com/')\""
- # sudo su - -c "R -e \"install.packages('shinyFiles', repos='http://cran.rstudio.com/')\""
- # sudo su - -c "R -e \"install.packages('cronR', repos='http://cran.rstudio.com/')\""
+    # sudo su - -c "R -e \"install.packages('data.table', repos='http://cran.rstudio.com/')\""
+    # sudo su - -c "R -e \"install.packages('bit64', repos='http://cran.rstudio.com/')\""
+    # sudo su - -c "R -e \"install.packages('tidyr', repos='http://cran.rstudio.com/')\""
+    # sudo su - -c "R -e \"install.packages('dplyr', repos='http://cran.rstudio.com/')\""
+    # sudo su - -c "R -e \"install.packages('lubridate', repos='http://cran.rstudio.com/')\""
+    # sudo su - -c "R -e \"install.packages('magrittr', repos='http://cran.rstudio.com/')\""
+    # sudo su - -c "R -e \"install.packages('knitr', repos='http://cran.rstudio.com/')\""
+    # sudo su - -c "R -e \"install.packages('ggplot2', repos='http://cran.rstudio.com/')\""
+    # sudo su - -c "R -e \"install.packages('plotly', repos='http://cran.rstudio.com/')\""
+    # sudo su - -c "R -e \"install.packages('caTools', repos='http://cran.rstudio.com/')\""
+    # sudo su - -c "R -e \"install.packages('bitops', repos='http://cran.rstudio.com/')\""
+    # sudo su - -c "R -e \"install.packages('rprojroot', repos='http://cran.rstudio.com/')\""
+    # sudo su - -c "R -e \"install.packages('rmarkdown', repos='http://cran.rstudio.com/')\""
+    # sudo su - -c "R -e \"install.packages('miniUI', repos='http://cran.rstudio.com/')\""
+    # sudo su - -c "R -e \"install.packages('shinyFiles', repos='http://cran.rstudio.com/')\""
+    # sudo su - -c "R -e \"install.packages('cronR', repos='http://cran.rstudio.com/')\""
 
     library(data.table) # fread
     library(bit64)      # integer64 type
@@ -61,7 +59,7 @@ Let me know any feature requests by filing an issue: https://github.com/MR1991/C
     # https://cran.r-project.org/web/packages/crypto/index.html
 
     # Production dataset
-    df_marketdata      <- as.data.frame(fread("data/Crypto-Markets.csv", showProgress = FALSE)) 
+    df_marketdata      <- as.data.frame(fread("/srv/shiny-server/data/Crypto-Markets.csv", showProgress = FALSE)) 
     df_marketdata$date %<>% as.Date("%Y-%m-%d")
     df_marketdata$low  %<>% as.numeric()
 
@@ -116,12 +114,13 @@ Let me know any feature requests by filing an issue: https://github.com/MR1991/C
 
 ```{r Model}  
         
-    run_model <- function(SDate, EDate, MaxRank, HPeriod, CoinsPeriod, StopLoss, Initial, Reinvest, HoldInBTC){
+    run_model <- function(SDate, EDate, MinRank, MaxRank, HPeriod, CoinsPeriod, StopLoss, Initial, Reinvest, HoldInBTC){
             
         # Calculate % gain over previous period and actual gain over next period. Not adjusted for stoploss.
         df_modeldata <- df_marketdata %>% 
                         filter(date >= SDate - HPeriod & date <= EDate + HPeriod,
-                               rankthen <= MaxRank) %>%
+                               rankthen <= MaxRank,
+                               rankthen >= MinRank) %>%
                         arrange(ranknow, date) %>% 
                         group_by(ranknow) %>%
                         mutate(prevclose = lag(close, n = HPeriod, default = NA))   %>%
@@ -196,7 +195,10 @@ Let me know any feature requests by filing an issue: https://github.com/MR1991/C
     # # start and end date of analysis
     # SDate <- as.Date("2017-10-01")
     # EDate <- as.Date("2017-12-31")
-    # 
+    #  
+    # # max rank of coins to be selected
+    # MinRank <- 0
+    #
     # # max rank of coins to be selected
     # MaxRank <- 150
     # 
@@ -236,7 +238,7 @@ Let me know any feature requests by filing an issue: https://github.com/MR1991/C
                        label = "Date range:",
                        start = min("2017-10-01", na.rm = TRUE),
                        end = max(df_marketdata$date, na.rm = TRUE)),
-
+        numericInput("MinRank"    , "Min rank of selected coins:", value = 0),
         numericInput("MaxRank"    , "Max rank of selected coins:", value = 150),
         numericInput("HPeriod"    , "Length of period in days:" , value = 7),
         numericInput("CoinsPeriod", "# of coins per period:"    , value = 2),
@@ -249,6 +251,7 @@ Let me know any feature requests by filing an issue: https://github.com/MR1991/C
     activeDataset <- reactive({
         run_model(input$dateRange[1],
                   input$dateRange[2],
+                  input$MinRank,
                   input$MaxRank,
                   input$HPeriod,
                   input$CoinsPeriod,
@@ -303,14 +306,15 @@ Let me know any feature requests by filing an issue: https://github.com/MR1991/C
 
 Name | Description
 ------------------ | -------------------------------------------------
-Date Range | The period for which you want to test your strategy, 
+Date Range | The period for which you want to test your strategy. 
+Min rank of selected coins | The minimum rank a coin is allowed to have for you to select it for a given period.
 Max rank of selected coins | The maximum rank a coin is allowed to have for you to select it for a given period.
 Length of period in days | Number of days you hold on to your coins before reevaluating.
 '#' of coins per period | Number of coins you buy per period.
 Starting funds ($) | Initial investment spread out over the number of coins. Current model uses this each period.
 Maximum loss: | Stop loss level. Default is -25% of last close. If a coin goes under this level during a period your holdings in this coin are 'sold' until next period.
 
-#### Output  
+### Output  
   
 **Graph**  
 The bars in the graph show the gain/loss in $ per period summed for your coins held during this period.  

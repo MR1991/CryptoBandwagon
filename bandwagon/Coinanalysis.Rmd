@@ -10,7 +10,7 @@ options(scipen = 999)
 
 
 ```{r libraries}
-
+    
     library(data.table) # fread
     library(bit64)      # integer64 type
     library(tidyr)      # data wrangling
@@ -21,7 +21,7 @@ options(scipen = 999)
     library(ggplot2)    # plotting
     library(plotly)     # dynamic plots
     library(tidyquant)
-    
+
 ```
 
 ```{r Load data, cache = FALSE, warning = FALSE}
@@ -30,7 +30,7 @@ options(scipen = 999)
     # https://cran.r-project.org/web/packages/crypto/index.html
 
     # Production dataset
-    df_marketdata        <- as.data.frame(fread("data/Crypto-Markets.csv", showProgress = FALSE)) 
+    df_marketdata        <- as.data.frame(fread("/srv/shiny-server/data/Crypto-Markets.csv", showProgress = FALSE)) 
     df_marketdata$date   %<>% as.Date("%Y-%m-%d")
 
 ```
