@@ -59,16 +59,15 @@ Thanks to the team at https://coinmarketcap.com for consolidating all the tradin
 Also many thanks to [JesseVent](https://github.com/JesseVent/) for the [Crypto package](https://cran.r-project.org/web/packages/crypto/index.html) to scrape historical data.  
 Please star my repo if you find it useful and be responsible when trading.  
   
-***
 <center>
+***
 **Donations are welcome!**  
 **Bitcoin/Bitcoin Cash:** 16f5MKogAhddR63b2zZEFx7g5yLB2oyV76   
 **ERC-20:** 0x0134cfe4c693c0ae4287caa235dc540953ffbc16  
 **Litecoin:** LdVZXYgF3qhGEkHKJGJ1n3gyK4w8GHvRBq  
 **NANO:** xrb_39tq7hidqkknoux8sps9q7e49eky4prnaauqge8tj8yfpexmmqcx4xafn4zk  
-</center>
+
 ***
-    
-    
+</center>   
     
 
