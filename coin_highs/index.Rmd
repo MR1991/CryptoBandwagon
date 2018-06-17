@@ -1,0 +1,60 @@
+---
+title: <center> <h1>Last Coin Highs</h1> </center>
+output: html_document
+runtime: shiny
+---
+<center>
+***
+**If you like it please donate to upgrade hosting**  
+**Bitcoin/Bitcoin Cash:** 16f5MKogAhddR63b2zZEFx7g5yLB2oyV76   
+**ERC-20:** 0x0134cfe4c693c0ae4287caa235dc540953ffbc16  
+**Litecoin:** LdVZXYgF3qhGEkHKJGJ1n3gyK4w8GHvRBq  
+**NANO:** xrb_39tq7hidqkknoux8sps9q7e49eky4prnaauqge8tj8yfpexmmqcx4xafn4zk  
+
+***
+
+
+```{r setup, include = FALSE}
+    knitr::opts_chunk$set(echo = FALSE)
+    options(scipen = 999)
+```
+
+```{r libraries, include = FALSE, warning = FALSE}
+
+  library(tseries)
+  library(ggplot2)
+  library(magrittr)
+  library(dplyr)
+  library(forecast)
+  library(shiny)
+
+```
+
+
+
+```{r Table}
+
+  df <- read.csv(file = "/srv/shiny-server/data/Crypto-Markets.csv", stringsAsFactors = FALSE)
+  
+  get_stats <- function(x){
+    max_mc    <- max(x$market)
+    max       <- max(x$close)
+    date_max  <- x %>% filter(close == max) %$% date
+    last      <- tail(x$close, 1)
+    date_last <- x %>% filter(close == last) %$% date
+    diff      <- (last-max)/max *100
+    data.frame(max_mc, date_max, max, date_last, last, diff, stringsAsFactors = FALSE)
+  }
+  
+  results_table <- df %>% group_by(symbol) %>% do(get_stats(.)) %>% arrange(desc(max_mc)) %>% filter(symbol != "USDT")
+
+  renderTable({
+      print(results_table)
+  })
+
+    
+```
+</center>
+
+
+

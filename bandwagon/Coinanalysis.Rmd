@@ -72,16 +72,16 @@ options(scipen = 999)
     arrange(ranknow, desc(date)) %>% 
     select(symbol, date, change) %>%
     spread(symbol, change)
-  
-    ggplotly(qplot(ranknow, change, data = biggest, colour = as.character(date))+
-      scale_y_continuous(limits = c(-1,200))+
-      scale_color_manual(name = "date",
-                     values = c("2018-04-08" = "black",
-                                "2018-04-15" = "yellow",
-                                "2018-04-22" = "red",
-                                "2018-04-29" = "green"),
-                     labels = c("2018-04-08", "2018-04-15", "2018-04-22","2018-04-29")))
-    
+    # 
+    # ggplotly(qplot(ranknow, change, data = biggest, colour = as.character(date))+
+    #   scale_y_continuous(limits = c(-1,200))+
+    #   scale_color_manual(name = "date",
+    #                  values = c("2018-04-08" = "black",
+    #                             "2018-04-15" = "yellow",
+    #                             "2018-04-22" = "red",
+    #                             "2018-04-29" = "green"),
+    #                  labels = c("2018-04-08", "2018-04-15", "2018-04-22","2018-04-29")))
+    # 
 
 
   
@@ -100,18 +100,18 @@ options(scipen = 999)
     mutate(change = close/lag(close, n = 1, default = NA)*100-100) %>%
     filter(!is.na(change)) %>% 
     arrange(ranknow, desc(date)) %>% 
-     select(symbol, date, change)# %>%
+    select(symbol, date, change)# %>%
     # spread(symbol, change)
   
-    ggplotly(qplot(ranknow, change, data = biggest, colour = as.character(date))+
-      scale_y_continuous(limits = c(-1,200))+
-      scale_color_manual(name = "date",
-                     values = c("2018-04-08" = "black",
-                                "2018-04-15" = "yellow",
-                                "2018-04-22" = "red",
-                                "2018-04-29" = "green"),
-                     labels = c("2018-04-08", "2018-04-15", "2018-04-22","2018-04-29")))
-    
+    # ggplotly(qplot(ranknow, change, data = biggest, colour = as.character(date))+
+    #   scale_y_continuous(limits = c(-1,200))+
+    #   scale_color_manual(name = "date",
+    #                  values = c("2018-04-08" = "black",
+    #                             "2018-04-15" = "yellow",
+    #                             "2018-04-22" = "red",
+    #                             "2018-04-29" = "green"),
+    #                  labels = c("2018-04-08", "2018-04-15", "2018-04-22","2018-04-29")))
+    # 
 
 
   
