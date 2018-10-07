@@ -3,6 +3,16 @@ title: <center> <h1>Crypto Bandwagon Backtester</h1> </center>
 output: html_document
 runtime: shiny
 ---
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-30875131-2"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  
+  gtag('config', 'UA-30875131-2');
+</script>
+
 <center>
 ***
 **If you like it please donate to upgrade hosting**  
@@ -15,7 +25,6 @@ Description of model is at the bottom of this page.
 Let me know any feature requests by filing an issue: https://github.com/MR1991/CryptoBandwagon/  
   
 ***
-
 
 ```{r setup, include = FALSE}
     knitr::opts_chunk$set(echo = FALSE)
@@ -229,7 +238,6 @@ Let me know any feature requests by filing an issue: https://github.com/MR1991/C
 
 
 ```
-
 
 ```{r Model Graph}
 
